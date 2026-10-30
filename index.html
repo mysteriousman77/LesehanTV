@@ -153,7 +153,7 @@ input[type=range]{width:100%;accent-color:var(--ac)}
 .ec.on.seen::after{color:#fff}
 
 #pinfo{max-width:900px;margin:0 auto;padding:16px 14px 40px}
-.pi2{display:flex;gap:12px;align-items:center;margin-bottom:16px}.pi2 h3{font-size:16px;font-weight:500}.pi2 small{color:var(--m);font-size:12px}
+.pi2{display:flex;gap:12px;align-items:center;margin-bottom:16px}.pi2 h3{font-size:16px;font-weight:500}.pi2 small{color:var(--m);font-size:12px}.pi2 .pvw{display:block;margin-top:3px}
 .th{width:54px;height:54px;border-radius:50%;background:#222 center/cover;flex-shrink:0}
 .nvb{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}.nvb .btn{padding:10px;font-size:12px}
 .ecs{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;margin-top:10px;padding-bottom:6px}.ecs::-webkit-scrollbar{display:none}
@@ -326,6 +326,7 @@ function load(){
 const popular=()=>GL.map(g=>({g,v:views(g.title)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v).slice(0,30).map(x=>x.g);
 window.onViews=()=>{
   if(!D.length)return;
+  const pvc=$("pvc");if(pvc&&cur>=0&&D[cur])pvc.textContent=fv(views(D[cur].title));
   updHot();
   if(!viewsOnce&&(tab==="popular"||tab==="home")&&!ov.length){viewsOnce=1;render()}
 };
@@ -336,7 +337,7 @@ function pc(g,f){
   return `<div class="pc" onclick="${f||"openT"}(${g.gi})"><div class="pi" ${bg(g.thumb)}><span class="bdg">${esc(g.cat)}</span>${HOT.has(g.title)?'<span class="vw hot">🔥</span>':""}<b class="ne">${n}</b></div><div class="pt">${esc(g.title)}</div></div>`;
 }
 function lc(i){
-  return `<div class="lc" onclick="play(${i.id})"><div class="li" ${bg(i.thumb)}><b class="ne">${esc(i.eps||"Film")}</b><span class="tp ${isHls(i.src)?"h":"e"}">${isHls(i.src)?"HLS":"EMBED"}</span></div><div class="pt">${esc(i.title)}${isNew(i.id)?'<span class="np">NEW</span>':""}</div></div>`;
+  return `<div class="lc" onclick="${GM[i.title]?"openT("+GM[i.title].gi+")":"play("+i.id+")"}"><div class="li" ${bg(i.thumb)}><b class="ne">${esc(i.eps||"Film")}</b><span class="tp ${isHls(i.src)?"h":"e"}">${isHls(i.src)?"HLS":"EMBED"}</span></div><div class="pt">${esc(i.title)}${isNew(i.id)?'<span class="np">NEW</span>':""}</div></div>`;
 }
 function cwRow(){
   const l=LS("lesehan_continue",[]);if(!l.length)return"";
@@ -532,7 +533,7 @@ function rInfo(){
   const s=LS("lesehan_saturation",100),rc=recs(),SN=LS("lesehan_seen",{});
   $("pbt").textContent=it.title+(it.eps?" - "+it.eps:"");
   const pe=$("pinfo");
-  pe.innerHTML=`<div class="card2 satc"><div class="sr"><span>🎨 Saturasi Warna</span><b id="sv">${s}%</b></div><input type="range" min="100" max="200" value="${s}" oninput="setSat(this.value)"></div>${sleepCard(it)}<div class="pi2"><div class="th" ${bg(it.thumb)}></div><div><h3>${esc(it.title)}</h3><small>${esc(it.eps||"Film")} • ${isHls(it.src)?"HLS":"EMBED"}</small></div></div>`+
+  pe.innerHTML=`<div class="card2 satc"><div class="sr"><span>🎨 Saturasi Warna</span><b id="sv">${s}%</b></div><input type="range" min="100" max="200" value="${s}" oninput="setSat(this.value)"></div>${sleepCard(it)}<div class="pi2"><div class="th" ${bg(it.thumb)}></div><div><h3>${esc(it.title)}</h3><small>${esc(it.eps||"Film")} • ${isHls(it.src)?"HLS":"EMBED"}</small><small class="pvw">👁 <span id="pvc">${fv(views(it.title))}</span> penonton</small></div></div>`+
   (g.eps.length>1?`<div class="sh2"><div class="st">Episode List</div><button class="ordb" onclick="togOrd('p')">${ordP()==="desc"?"↓ Terbaru":"↑ Terlama"}</button></div><div class="ecs">${(ordP()==="desc"?g.eps.slice().reverse():g.eps).map(e=>`<button class="ec ${e.id===cur?"on":""} ${SN[e.src]?"seen":""}" data-id="${e.id}" onclick="play(${e.id})">${esc(e.eps.replace(/^Eps\s*/i,"")||"▶")}</button>`).join("")}</div>`:"")+
   (rc.length?`<div class="st" style="margin:22px 2px 12px">Rekomendasi Video</div><div class="grid">${rc.map(x=>pc(x,"playT")).join("")}</div>`:"");
   pe.classList.remove("fi");void pe.offsetWidth;pe.classList.add("fi");
