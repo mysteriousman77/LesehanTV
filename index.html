@@ -18,275 +18,18 @@ var Tawk_LoadStart=new Date();
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import {getDatabase,ref,set,onValue,onDisconnect,push,increment,update,remove,query,orderByChild,limitToLast,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-import {getAuth,signInAnonymously,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-const app=initializeApp({
-  apiKey:"AIzaSyAldxVsKoq0KDWkZI-eDfKG7Qy84-TUqBQ",authDomain:"lesehantv-9476a.firebaseapp.com",
+import {getDatabase,ref,set,onValue,onDisconnect,push,increment} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+const db=getDatabase(initializeApp({
+  apiKey:"AIzaSyAldxVsKoq0KDwkZI-eDFK67Qy84-TUqBQ",authDomain:"lesehantv-9476a.firebaseapp.com",
   databaseURL:"https://lesehantv-9476a-default-rtdb.firebaseio.com",projectId:"lesehantv-9476a",
-  storageBucket:"lesehantv-9476a.firebasestorage.app",messagingSenderId:"23342742276",
-  appId:"1:23342742276:web:dbde1639dd72fae7e46e51",measurementId:"G-08DCGX0GYZ"});
-const db=getDatabase(app);
+  storageBucket:"lesehantv-9476a.appspot.com",messagingSenderId:"23342742276",
+  appId:"1:23342742276:web:dbde1639dd72fae7e46e51",measurementId:"G-08DCGX8GY2"}));
 // jumlah online
 onValue(ref(db,".info/connected"),s=>{if(s.val()===true){const r=push(ref(db,"online_users"));onDisconnect(r).remove().then(()=>set(r,{joinedAt:Date.now()}))}});
 onValue(ref(db,"online_users"),s=>{window.onlineN=s.exists()?Object.keys(s.val()).length:1;document.querySelectorAll(".onl").forEach(e=>e.textContent=window.onlineN)});
 // views per judul
 window.trackView=k=>{if(k)set(ref(db,"views/"+k),increment(1)).catch(()=>{})};
 onValue(ref(db,"views"),s=>{window.VC=s.exists()?s.val():{};if(window.onViews)window.onViews()});
-/* ===== KOMENTAR, BALASAN, SUKA, PENANDA ADMIN ===== */
-// Isi dengan UID akun admin (Firebase Console > Authentication > Users). Kosongkan = fitur admin mati.
-const ADMIN_UID="TWAGrKkSqMcqHo1n6BnXEiioLg53";
-const auth=getAuth(app);
-const CM={tk:"",un:null,data:{},uid:null,loaded:false,shown:15,open:{},reply:"",rtext:"",draft:"",eps:"",last:0,showA:false,authFail:false,nm:""};
-const E=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&","<":"<",">":">",'"':""","'":"'"}[c]));
-const T=m=>{if(window.toast)window.toast(m)};
-const G=i=>document.getElementById(i);
-const isAdm=()=>!!CM.uid&&ADMIN_UID!=="ISI_UID_ADMIN"&&CM.uid===ADMIN_UID;
-const cmName=()=>{try{return localStorage.getItem("lesehan_name")||""}catch(e){return""}};
-const hue=s=>{s=String(s||"");let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))%360;return h};
-const ago=t=>{t=+t||0;const s=(Date.now()-t)/1000;if(s<60)return"baru saja";if(s<3600)return Math.floor(s/60)+" mnt lalu";if(s<86400)return Math.floor(s/3600)+" jam lalu";if(s<2592000)return Math.floor(s/86400)+" hari lalu";return new Date(t).toLocaleDateString("id-ID")};
-
-function authTry(){signInAnonymously(auth).then(()=>{CM.authFail=false}).catch(e=>{CM.authFail=(e&&e.code)||"error";cmForm()})}
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!CM.uid&&CM.authFail)authTry()});
-onAuthStateChanged(auth,u=>{
-  CM.uid=u?u.uid:null;xpBind();
-  if(!u)authTry();
-  cmForm();cmList();cmAdm();
-});
-
-window.cmOpen=(tk,eps)=>{
-  const box=G("cm");if(!box)return;
-  CM.eps=eps||"";
-  box.innerHTML='<div class="st cmh">Komentar <span id="cmn"></span></div>'+
-    '<div class="cmw"><input id="cmnm" maxlength="20" placeholder="Nama panggilan" autocomplete="nickname" value="'+E(CM.nm||cmName())+'"'+(CM.nm?' readonly':'')+'><small class="lvn" id="cmnn"></small>'+
-    '<textarea id="cmt" maxlength="500" rows="2"></textarea>'+
-    '<div class="cmr"><span id="cmc">0/500</span><button class="btn" id="cmsend" data-a="send">Kirim</button></div></div>'+
-    '<div id="cml"></div><div id="cma"></div>';
-  G("cmt").value=CM.draft;cmCnt();
-  box.onclick=cmClick;
-  box.oninput=e=>{if(e.target.id==="cmt"){CM.draft=e.target.value;cmCnt()}if(e.target.classList.contains("cmrt"))CM.rtext=e.target.value};
-  if(CM.tk!==tk){
-    if(CM.un){CM.un();CM.un=null}
-    CM.tk=tk;CM.data={};CM.shown=15;CM.open={};CM.reply="";CM.rtext="";CM.loaded=false;
-    CM.un=onValue(query(ref(db,"comments/"+tk),orderByChild("ts"),limitToLast(200)),
-      s=>{CM.data=s.exists()?s.val():{};CM.loaded=true;likeCredit();cmList()},
-      ()=>{CM.data={};CM.loaded=true;cmList()});
-  }
-  cmForm();cmList();cmAdm();
-};
-window.cmClose=()=>{if(CM.un){CM.un();CM.un=null}CM.tk="";CM.data={};CM.loaded=false;CM.reply="";CM.rtext=""};
-
-function cmCnt(){const t=G("cmt"),c=G("cmc");if(t&&c)c.textContent=t.value.length+"/500"}
-function cmForm(){
-  const t=G("cmt"),b=G("cmsend");if(!t)return;
-  const nm=G("cmnm"),nn=G("cmnn");
-  if(nm){if(CM.nm){nm.value=CM.nm;nm.readOnly=true}else nm.readOnly=false}
-  if(nn)nn.textContent=CM.nm?"Nama dikunci dan tidak bisa diganti.":"Nama harus unik (huruf, angka, spasi, _ dan -) dan tidak bisa diganti setelah komentar pertama.";
-  t.disabled=b.disabled=!CM.uid;
-  t.placeholder=CM.uid?"Tulis komentar...":(CM.authFail?"Komentar belum aktif ("+CM.authFail+")":"Menyambungkan...");
-}
-function cmAdm(){
-  const a=G("cma");if(!a)return;
-  if(isAdm()){a.innerHTML='<button class="cbt" data-a="alogout">Admin aktif - Keluar</button>';return}
-  a.innerHTML=CM.showA
-    ?'<div class="cmw"><input id="cae" type="email" placeholder="Email admin" autocomplete="username"><input id="cap" type="password" placeholder="Kata sandi" autocomplete="current-password"><button class="btn" data-a="alogin">Masuk</button></div>'
-    :'<button class="cbt" data-a="adm">Masuk admin</button>';
-}
-
-function cmList(){
-  const l=G("cml");if(!l)return;
-  if(!CM.loaded){l.innerHTML='<div class="cme">Memuat komentar...</div>';return}
-  const all=Object.entries(CM.data||{}).filter(([k,c])=>c&&typeof c.text==="string").map(([k,c])=>Object.assign({},c,{id:k}));
-  const tops=all.filter(c=>!c.p).sort((a,b)=>(+b.ts||0)-(+a.ts||0));
-  const ids=new Set(tops.map(c=>c.id)),reps={};
-  all.filter(c=>c.p&&ids.has(c.p)).sort((a,b)=>(+a.ts||0)-(+b.ts||0)).forEach(c=>(reps[c.p]=reps[c.p]||[]).push(c));
-  const total=tops.length+Object.values(reps).reduce((s,a)=>s+a.length,0),n=G("cmn");
-  if(n)n.textContent=total?"("+total+")":"";
-  const old=l.querySelector(".cmrt"),foc=old&&document.activeElement===old;
-  if(old)CM.rtext=old.value;
-  if(!tops.length){l.innerHTML='<div class="cme">Belum ada komentar. Jadilah yang pertama.</div>';return}
-  const item=(c,rp,extra)=>{
-    const lk=c.likes||{},ln=Object.keys(lk).length,me=!!(CM.uid&&lk[CM.uid]),can=!!CM.uid&&(c.uid===CM.uid||isAdm()),id=E(c.id);
-    return '<div class="cmi'+(rp?" rp":"")+'"><div class="cav" style="background:hsl('+hue(c.uid||c.name)+' 55% 38%)">'+E(String(c.name||"?").trim().charAt(0).toUpperCase())+'</div><div class="cmb">'+
-      '<div class="cmm"><b>'+E(c.name)+'</b>'+(c.adm===true?'<span class="cbd">Admin</span>':'')+lvb(c.xp)+'<small>'+ago(c.ts)+(c.eps?" - "+E(c.eps):"")+'</small></div>'+
-      '<div class="cmx">'+E(c.text)+'</div>'+
-      '<div class="cma2"><button class="cbt'+(me?" on":"")+'" data-a="like" data-id="'+id+'" aria-label="Suka">'+(me?"♥":"♡")+(ln?" "+ln:"")+'</button>'+
-      (rp?"":'<button class="cbt" data-a="reply" data-id="'+id+'">Balas</button>')+
-      (can?'<button class="cbt" data-a="del" data-id="'+id+'">Hapus</button>':"")+'</div>'+(extra||"")+'</div></div>';
-  };
-  const rbox=c=>'<div class="cmw cmrb"><textarea class="cmrt" maxlength="500" rows="2" placeholder="Balas '+E(c.name)+'..."></textarea><div class="cmr"><button class="btn dark" data-a="rcancel">Batal</button><button class="btn" data-a="rsend" data-id="'+E(c.id)+'">Kirim</button></div></div>';
-  l.innerHTML=tops.slice(0,CM.shown).map(c=>{
-    const rs=reps[c.id]||[],op=CM.open[c.id]||CM.reply===c.id,id=E(c.id);
-    let ex="";
-    if(rs.length)ex+='<button class="cbt cmtg" data-a="togr" data-id="'+id+'">'+(op?"Sembunyikan balasan":"Lihat "+rs.length+" balasan")+'</button>';
-    if(op)ex+='<div class="cmrs">'+rs.map(r=>item(r,1)).join("")+(CM.reply===c.id?rbox(c):"")+'</div>';
-    return item(c,0,ex);
-  }).join("")+(tops.length>CM.shown?'<button class="btn dark wide cmmore" data-a="more">Muat lagi</button>':"");
-  const nt=l.querySelector(".cmrt");
-  if(nt){nt.value=CM.rtext;if(foc||CM.focusReply){nt.focus();CM.focusReply=false}}
-}
-
-function cmPost(text,name,p){
-  if(!CM.uid){T("Komentar belum aktif");return false}
-  name=String(name||"").trim().replace(/\s+/g," ").slice(0,20);text=String(text||"").trim().slice(0,500);
-  if(CM.nm)name=CM.nm;
-  if(name.length<2){T("Isi nama panggilan minimal 2 huruf");return false}
-  if(!CM.nm&&!/^[A-Za-z0-9 _-]{2,20}$/.test(name)){T("Nama hanya boleh huruf, angka, spasi, _ dan -");return false}
-  if(!text){T("Komentar masih kosong");return false}
-  const n=Date.now();if(n-CM.last<10000){T("Tunggu sebentar sebelum mengirim lagi");return false}
-  try{localStorage.setItem("lesehan_name",name)}catch(e){}
-  CM.last=n;
-  const send=()=>flush().then(()=>{
-    const c={uid:CM.uid,name:name,text:text,ts:serverTimestamp()},x=Math.floor(XP.v);
-    if(x>0)c.xp=x;if(p)c.p=p;if(CM.eps)c.eps=String(CM.eps).slice(0,30);if(isAdm())c.adm=true;
-    push(ref(db,"comments/"+CM.tk),c).then(()=>addXp("c",5)).catch(()=>{CM.last=0;T("Gagal mengirim komentar")});
-  });
-  if(CM.nm)send();
-  else set(ref(db,"names/"+name.toLowerCase()),CM.uid).then(()=>
-    set(ref(db,"users/"+CM.uid+"/name"),name).then(()=>{CM.nm=name;cmForm();send()}).catch(()=>{CM.last=0;T("Gagal menyimpan nama, coba lagi")})
-  ,()=>{CM.last=0;T("Nama sudah dipakai, pilih nama lain")});
-  return true;
-}
-function cmDel(id){
-  if(!confirm("Hapus komentar ini?"))return;
-  const fail=()=>T("Gagal menghapus komentar");
-  if(isAdm()){
-    const u={};u[id]=null;Object.entries(CM.data||{}).forEach(([k,c])=>{if(c&&c.p===id)u[k]=null});
-    update(ref(db,"comments/"+CM.tk),u).catch(fail);
-  }else remove(ref(db,"comments/"+CM.tk+"/"+id)).catch(fail);
-}
-function cmClick(e){
-  const b=e.target.closest("[data-a]");if(!b)return;
-  const a=b.dataset.a,id=b.dataset.id;
-  if(a==="send"){
-    const t=G("cmt");
-    if(cmPost(t.value,G("cmnm").value,"")){t.value="";CM.draft="";cmCnt()}
-  }else if(a==="like"){
-    if(!CM.uid){T("Komentar belum aktif");return}
-    const c=CM.data[id],me=c&&c.likes&&c.likes[CM.uid],r=ref(db,"comments/"+CM.tk+"/"+id+"/likes/"+CM.uid);
-    (me?remove(r):set(r,true)).catch(()=>T("Gagal memberi suka"));
-  }else if(a==="reply"){
-    CM.reply=id;CM.rtext="";CM.focusReply=true;cmList();
-  }else if(a==="rcancel"){
-    CM.reply="";CM.rtext="";cmList();
-  }else if(a==="rsend"){
-    const rt=document.querySelector("#cml .cmrt"),nm=G("cmnm").value||cmName();
-    if(rt&&cmPost(rt.value,nm,id)){CM.open[id]=true;CM.reply="";CM.rtext="";cmList()}
-  }else if(a==="togr"){
-    CM.open[id]=!CM.open[id];if(!CM.open[id]&&CM.reply===id){CM.reply="";CM.rtext=""}cmList();
-  }else if(a==="del"){
-    cmDel(id);
-  }else if(a==="more"){
-    CM.shown+=15;cmList();
-  }else if(a==="adm"){
-    CM.showA=true;cmAdm();
-  }else if(a==="alogin"){
-    const em=G("cae").value.trim(),pw=G("cap").value;if(!em||!pw){T("Isi email dan kata sandi");return}
-    signInWithEmailAndPassword(auth,em,pw).then(()=>{CM.showA=false;T("Masuk sebagai admin")}).catch(()=>T("Email atau kata sandi salah"));
-  }else if(a==="alogout"){
-    signOut(auth).catch(()=>{});
-  }
-}
-
-/* saat mengetik/membalas: otomatis gulir ke kotak tulis (tepat di bawah video) */
-function cmFocusScroll(el){
-  const pv=G("pv"),pw=pv&&pv.querySelector(".pw");if(!pv||!pw||!el)return;
-  const go=()=>{
-    if(document.activeElement!==el)return;
-    if(getComputedStyle(pw).position!=="sticky"){el.scrollIntoView({block:"center",behavior:"smooth"});return}
-    const d=el.getBoundingClientRect().top-pw.getBoundingClientRect().bottom-12;
-    if(Math.abs(d)>4)pv.scrollBy({top:d,behavior:"smooth"});
-  };
-  setTimeout(go,150);setTimeout(go,500);
-}
-document.addEventListener("focusin",e=>{const t=e.target;if(t&&t.matches&&t.matches("#cmt,.cmrt,#cmnm,#cae,#cap"))cmFocusScroll(t)});
-
-/* ===== LEVEL (tingkatan Battle Through the Heavens) ===== */
-// XP: menonton 1/menit (maks 120/hari), komentar +5 (maks 15/hari), suka diterima +2 (maks 20/hari)
-const RK=[["Dou Zhe",0,"#a1a1aa"],["Dou Shi",100,"#4ade80"],["Da Dou Shi",300,"#2dd4bf"],["Dou Ling",700,"#38bdf8"],["Dou Wang",1500,"#818cf8"],["Dou Huang",3000,"#c084fc"],["Dou Zong",6000,"#f472b6"],["Dou Zun",12000,"#fb923c"],["Dou Sheng",25000,"#facc15"],["Dou Di",50000,"#ff2d46"]];
-const XCAP={w:120,c:15,l:20};
-const XP={v:0,p:0,ready:false};
-function jget(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
-function jset(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
-function xpTotal(){return XP.v+XP.p}
-function xpDay(){const d=new Date().toLocaleDateString("sv-SE");let r=jget("lesehan_xpd");if(!r||r.d!==d)r={d:d,w:0,c:0,l:0};return r}
-function lvInfo(xp){
-  xp=Math.max(0,Math.floor(+xp||0));
-  let r=0;for(let i=RK.length-1;i>=0;i--)if(xp>=RK[i][1]){r=i;break}
-  const o={r:r,n:RK[r][0],c:RK[r][2],s:0,idx:r*3,a:RK[r][1],b:null,nx:null,nn:""};
-  if(r===RK.length-1)return o;
-  const lo=RK[r][1],hi=RK[r+1][1],span=(hi-lo)/3,s=Math.min(3,1+Math.floor((xp-lo)/span));
-  o.s=s;o.idx=r*3+s-1;o.a=lo+span*(s-1);o.b=s<3?lo+span*s:hi;o.nx=Math.ceil(o.b);
-  o.nn=s<3?RK[r][0]+" "+"★".repeat(s+1):RK[r+1][0]+(r+1===RK.length-1?"":" ★");
-  return o;
-}
-const lvTxt=l=>l.n+(l.s?" "+"★".repeat(l.s):"");
-function lvb(xp){const l=lvInfo(xp);return '<span class="lvb" style="--lc:'+l.c+'">'+E(lvTxt(l))+'</span>'}
-function addXp(k,n){
-  const r=xpDay(),g=Math.max(0,Math.min(n,XCAP[k]-r[k]));
-  if(g<=0)return 0;
-  const before=lvInfo(xpTotal()).idx;
-  r[k]+=g;jset("lesehan_xpd",r);XP.p+=g;
-  const a=lvInfo(xpTotal());
-  if(a.idx>before)T("Naik level: "+lvTxt(a));
-  xpUi();return g;
-}
-function lvInner(){
-  const t=xpTotal(),l=lvInfo(t),d=xpDay(),f=n=>Math.floor(n).toLocaleString("id-ID");
-  let pr=100,nt="Tingkat tertinggi sudah tercapai";
-  if(l.b!=null){pr=Math.max(0,Math.min(100,(t-l.a)/(l.b-l.a)*100));nt="Butuh "+f(l.nx-t)+" XP lagi menuju "+l.nn}
-  return '<div class="lvt"><b style="color:'+l.c+'">'+E(lvTxt(l))+'</b><small>'+f(t)+' XP</small></div>'+
-    '<div class="lvp"><i style="width:'+pr.toFixed(1)+'%;background:'+l.c+'"></i></div>'+
-    '<small class="lvn">'+nt+'</small>'+
-    '<div class="lvr">'+RK.map((x,i)=>'<span class="lvk'+(i<=l.r?" on":"")+'" style="--lc:'+x[2]+'">'+E(x[0])+'</span>').join("")+'</div>'+
-    '<small class="lvn">XP hari ini: menonton '+d.w+'/'+XCAP.w+', komentar '+d.c+'/'+XCAP.c+', suka '+d.l+'/'+XCAP.l+'</small>';
-}
-window.lvCard=lvInner;
-function xpUi(){const e=G("lvc");if(e)e.innerHTML=lvInner()}
-
-/* sinkron XP ke Firebase (users/{uid}/xp) */
-let xpUn=null,xpUid=null,nmUn=null;
-function xpBind(){
-  if(xpUid===CM.uid)return;
-  xpUid=CM.uid;if(xpUn){xpUn();xpUn=null}
-  if(nmUn){nmUn();nmUn=null}
-  CM.nm="";
-  if(CM.uid)nmUn=onValue(ref(db,"users/"+CM.uid+"/name"),s=>{CM.nm=s.exists()?String(s.val()):"";cmForm()},()=>{});
-  XP.v=0;XP.ready=false;
-  if(CM.uid)xpUn=onValue(ref(db,"users/"+CM.uid+"/xp"),s=>{XP.v=s.exists()?(+s.val()||0):0;XP.ready=true;xpUi()},()=>{});
-  xpUi();
-}
-function flush(){
-  if(!CM.uid)return Promise.resolve();
-  const n=Math.min(Math.floor(XP.p),500);if(n<1)return Promise.resolve();
-  XP.p-=n;
-  return set(ref(db,"users/"+CM.uid+"/xp"),increment(n)).catch(()=>{XP.p+=n});
-}
-setInterval(flush,60000);
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")flush()});
-addEventListener("pagehide",()=>{flush()});
-
-/* XP dari menonton: dihitung tiap 5 detik saat video benar-benar jalan */
-let xpSec=0;
-setInterval(()=>{
-  if(document.visibilityState!=="visible")return;
-  const pv=G("pv");if(!pv||!pv.classList.contains("show"))return;
-  const v=G("v");
-  const on=v?(!v.paused&&!v.ended&&v.readyState>2):!!document.querySelector("#pl iframe");
-  if(!on)return;
-  xpSec+=5;if(xpSec>=60){xpSec-=60;addXp("w",1)}
-},5000);
-
-/* XP dari suka yang diterima (tidak menghitung suka dari diri sendiri) */
-function likeCredit(){
-  if(!CM.uid)return;
-  const m=jget("lesehan_lkc")||{};let ch=false;
-  Object.entries(CM.data||{}).forEach(([id,c])=>{
-    if(!c||c.uid!==CM.uid)return;
-    const n=Object.keys(c.likes||{}).filter(k=>k!==CM.uid).length,pv=m[id]||0;
-    if(n>pv){addXp("l",2*(n-pv));m[id]=n;ch=true}
-  });
-  if(ch){const ks=Object.keys(m);if(ks.length>300)ks.slice(0,ks.length-300).forEach(k=>delete m[k]);jset("lesehan_lkc",m)}
-}
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -444,7 +187,7 @@ input[type=range]{width:100%;accent-color:var(--ac)}
 .satc{margin:0 0 16px}
 .in2{animation:up .3s cubic-bezier(.2,.8,.2,1)}
 #pv,#detail{padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-@media (orientation:landscape) and (max-height:520px) and (min-width:600px){
+@media (orientation:landscape) and (max-height:520px){
   #pv{display:flex;overflow:hidden}
   .pw{position:relative;flex:0 0 58%;max-width:none;margin:0;height:100%;display:flex;flex-direction:column;border-bottom:0;border-right:1px solid rgba(255,45,70,.3);box-shadow:none}
   .pbox{flex:1;aspect-ratio:auto;min-height:0}
@@ -482,45 +225,6 @@ input[type=range]{width:100%;accent-color:var(--ac)}
 @supports ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
   .card2,.sb,.sel,.pw,.btn.dark,.mq{-webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5)}
 }
-/* komentar */
-.cmh{margin:22px 2px 12px}.cmh span{color:var(--m);font-size:14px;margin-left:4px}
-.cmw{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px;-webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5)}
-.cmw input,.cmw textarea{width:100%;background:rgba(0,0,0,.25);border:1px solid var(--ln);border-radius:12px;color:var(--t);font:inherit;font-size:16px;padding:10px 12px;outline:0;resize:none;-webkit-user-select:text;user-select:text}
-.cmw input::placeholder,.cmw textarea::placeholder{color:var(--m)}
-.cmw input:focus,.cmw textarea:focus{border-color:var(--ac);box-shadow:0 0 12px var(--gl2)}
-.cmw input:disabled,.cmw textarea:disabled{opacity:.5}
-.cmr{display:flex;align-items:center;justify-content:space-between;gap:8px}.cmr span{color:var(--m);font-size:12px}
-.cmr .btn{padding:9px 20px}.cmr .btn.dark{padding:9px 16px}
-.cmi{display:flex;gap:10px;padding:14px 2px;border-bottom:1px solid var(--ln)}
-.cmi.rp{border-bottom:0;padding:10px 0 2px}
-.cav{width:36px;height:36px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff}
-.cmi.rp .cav{width:28px;height:28px;font-size:12px}
-.cmb{flex:1;min-width:0}
-.cmm{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.cmm b{font-size:14px;font-weight:600}.cmm small{color:var(--m);font-size:11px}
-.cbd{background:var(--ac2);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;box-shadow:0 0 8px var(--gl2)}
-.cmx{font-size:14px;line-height:1.45;margin-top:3px;white-space:pre-wrap;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}
-.cma2{display:flex;gap:2px;margin-top:2px;margin-left:-8px}
-.cbt{background:none;border:0;color:var(--m);font-size:12px;font-weight:600;padding:7px 8px;border-radius:10px;cursor:pointer}
-.cbt.on{color:var(--ac)}
-.cbt:focus-visible{outline:2px solid var(--ac)}
-.cmtg{color:var(--ac);margin-left:-8px}
-.cmrs{margin-top:2px;padding-left:10px;border-left:2px solid var(--ln)}
-.cmrb{margin:8px 0 6px}
-.cme{text-align:center;color:var(--m);font-size:13px;padding:28px 10px}
-.cmmore{margin-top:14px}
-#cma{margin-top:16px;display:flex;justify-content:center}#cma .cmw{width:100%}
-#cma>.cbt{font-size:11px;opacity:.6}
-/* level */
-.lvb{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;color:var(--lc);border:1px solid var(--lc);background:rgba(255,255,255,.04);white-space:nowrap}
-.lvc{text-align:left;margin:0 0 16px}
-.lvt{display:flex;align-items:baseline;justify-content:space-between;gap:8px}.lvt b{font-size:20px;font-weight:700}.lvt small{color:var(--m);font-size:12px}
-.lvp{height:8px;border-radius:6px;background:rgba(255,255,255,.1);margin:10px 0 6px;overflow:hidden}.lvp i{display:block;height:100%;border-radius:6px;transition:width .4s}
-.lvn{display:block;color:var(--m);font-size:12px;line-height:1.5;margin-top:4px}
-.lvr{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 8px}
-.lvk{font-size:10px;padding:3px 8px;border-radius:10px;border:1px solid var(--ln);color:var(--m);opacity:.5}
-.lvk.on{color:var(--lc);border-color:var(--lc);opacity:1}
-.cmw input[readonly]{opacity:.7}
-@media (prefers-reduced-motion:reduce){.lvp i{transition:none}}
 </style>
 </head>
 <body>
@@ -556,7 +260,7 @@ document.documentElement.style.setProperty("--logo","url("+LOGO+")");document.ge
 const $=i=>document.getElementById(i);
 const LS=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
 const SV=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&","<":"<",">":">",'"':""","'":"'"}[c]));
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const bg=u=>u?`style="background-image:url('${esc(u)}')"`:"";
 let sortBy="new",flt="all",HOT=new Set(),sleepT=0,sleepEnd=0,sleepV="0",tapT=0,tapN=0,tapS=0,lim=60,D=[],GL=[],GM={},SM={},tab="home",cat="all",q="",cur=-1,hls=null,ov=[],hT=0,anT=null,lastSave=0,exitArmed=0,tT=0,viewsOnce=0;
 
@@ -720,7 +424,6 @@ function rLib(){
 }
 function rProf(){
   return `<div class="pf"><div class="av big"></div><h2>LesehanTV</h2><p>👁 <span class="onl">${window.onlineN||1}</span> orang online</p></div>
-  <div class="card2 lvc" id="lvc">${window.lvCard?window.lvCard():""}</div>
   <div class="stack"><a class="btn don" href="https://saweria.co/AKUINGINTERKENAL" target="_blank" rel="noopener noreferrer">❤ Dukung LesehanTV via Saweria</a>
   <a class="btn tg" href="https://t.me/+U0ocipINk6MzYmE1" target="_blank" rel="noopener noreferrer">Join Komunitas Telegram</a></div>
   <div class="note">Request movie, anime, donghua, drama via Saweria.</div>`;
@@ -774,7 +477,7 @@ function openT(gi){if(!GL[gi])return;dq="";rDetail(gi);$("detail").scrollTop=0;s
 function showOv(n){$(n).classList.add("show");if(!ov.includes(n)){ov.push(n);history.pushState({n:n},"")}}
 function hideOv(n){
   $(n).classList.remove("show");
-  if(n==="pv"){const fe=document.fullscreenElement||document.webkitFullscreenElement;if(fe){try{(document.exitFullscreen||document.webkitExitFullscreen).call(document)}catch(x){}try{screen.orientation.unlock()}catch(x){}}stopPlayer();clearSleep();cur=-1;if(window.cmClose)window.cmClose();if(!ov.length)render()}
+  if(n==="pv"){const fe=document.fullscreenElement||document.webkitFullscreenElement;if(fe){try{(document.exitFullscreen||document.webkitExitFullscreen).call(document)}catch(x){}try{screen.orientation.unlock()}catch(x){}}stopPlayer();clearSleep();cur=-1;if(!ov.length)render()}
 }
 addEventListener("DOMContentLoaded",()=>{history.replaceState({},"");history.pushState({},"");mig();$("pl").addEventListener("touchend",dtap,{passive:true});["touchstart","mousemove","click"].forEach(e=>$("pl").addEventListener(e,vcShow,{passive:true}));addEventListener("resize",applyFit);document.addEventListener("fullscreenchange",()=>{orient();setTimeout(applyFit,120)});document.addEventListener("webkitfullscreenchange",()=>{orient();setTimeout(applyFit,120)});load()});
 addEventListener("popstate",()=>{
@@ -827,14 +530,13 @@ function playT(gi){
 }
 function rInfo(){
   const it=D[cur],g=GM[it.title],i=g.eps.findIndex(e=>e.id===cur);
-  const s=LS("lesehan_saturation",100),SN=LS("lesehan_seen",{});
+  const s=LS("lesehan_saturation",100),rc=recs(),SN=LS("lesehan_seen",{});
   $("pbt").textContent=it.title+(it.eps?" - "+it.eps:"");
   const pe=$("pinfo");
   pe.innerHTML=`<div class="card2 satc"><div class="sr"><span>🎨 Saturasi Warna</span><b id="sv">${s}%</b></div><input type="range" min="100" max="200" value="${s}" oninput="setSat(this.value)"></div>${sleepCard(it)}<div class="pi2"><div class="th" ${bg(it.thumb)}></div><div><h3>${esc(it.title)}</h3><small>${esc(it.eps||"Film")} • ${isHls(it.src)?"HLS":"EMBED"}</small><small class="pvw">👁 <span id="pvc">${fv(views(it.title))}</span> penonton</small></div></div>`+
   (g.eps.length>1?`<div class="sh2"><div class="st">Episode List</div><button class="ordb" onclick="togOrd('p')">${ordP()==="desc"?"↓ Terbaru":"↑ Terlama"}</button></div><div class="ecs">${(ordP()==="desc"?g.eps.slice().reverse():g.eps).map(e=>`<button class="ec ${e.id===cur?"on":""} ${SN[e.src]?"seen":""}" data-id="${e.id}" onclick="play(${e.id})">${esc(e.eps.replace(/^Eps\s*/i,"")||"▶")}</button>`).join("")}</div>`:"")+
-  `<div id="cm"></div>`;
+  (rc.length?`<div class="st" style="margin:22px 2px 12px">Rekomendasi Video</div><div class="grid">${rc.map(x=>pc(x,"playT")).join("")}</div>`:"");
   pe.classList.remove("fi");void pe.offsetWidth;pe.classList.add("fi");
-  if(window.cmOpen)window.cmOpen(tkey(it.title),it.eps||"");
   const a=document.querySelector("#pinfo .ec.on");if(a)try{a.scrollIntoView({inline:"center",block:"nearest"})}catch(e){}
 }
 function step(d){
