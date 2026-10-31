@@ -19,7 +19,7 @@ var Tawk_LoadStart=new Date();
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import {getDatabase,ref,set,onValue,onDisconnect,push,increment,update,remove,query,orderByChild,limitToLast,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-import {getAuth,signInAnonymously,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import {getAuth,signInAnonymously,onAuthStateChanged,signInWithEmailAndPassword,signOut,GoogleAuthProvider,linkWithPopup,signInWithPopup,signInWithCredential} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 const app=initializeApp({
   apiKey:"AIzaSyAldxVsKoq0KDWkZI-eDfKG7Qy84-TUqBQ",authDomain:"lesehantv-9476a.firebaseapp.com",
   databaseURL:"https://lesehantv-9476a-default-rtdb.firebaseio.com",projectId:"lesehantv-9476a",
@@ -37,7 +37,7 @@ onValue(ref(db,"views"),s=>{window.VC=s.exists()?s.val():{};if(window.onViews)wi
 const ADMIN_UID="TWAGrKkSqMcqHo1n6BnXEiioLg53";
 const auth=getAuth(app);
 const CM={tk:"",un:null,data:{},uid:null,loaded:false,shown:15,open:{},reply:"",rtext:"",draft:"",eps:"",last:0,showA:false,authFail:false,nm:""};
-const E=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&","<":"<",">":">",'"':""","'":"'"}[c]));
+const E=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const T=m=>{if(window.toast)window.toast(m)};
 const G=i=>document.getElementById(i);
 const isAdm=()=>!!CM.uid&&ADMIN_UID!=="ISI_UID_ADMIN"&&CM.uid===ADMIN_UID;
@@ -48,7 +48,7 @@ const ago=t=>{t=+t||0;const s=(Date.now()-t)/1000;if(s<60)return"baru saja";if(s
 function authTry(){signInAnonymously(auth).then(()=>{CM.authFail=false}).catch(e=>{CM.authFail=(e&&e.code)||"error";cmForm()})}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!CM.uid&&CM.authFail)authTry()});
 onAuthStateChanged(auth,u=>{
-  CM.uid=u?u.uid:null;xpBind();
+  CM.uid=u?u.uid:null;CM.user=u;xpBind();accUi();
   if(!u)authTry();
   cmForm();cmList();cmAdm();
 });
@@ -186,6 +186,44 @@ function cmClick(e){
     signOut(auth).catch(()=>{});
   }
 }
+
+/* ===== LOGIN GOOGLE ===== */
+function accInner(){
+  const u=CM.user;
+  if(u&&!u.isAnonymous){
+    const nm=E(u.displayName||u.email||"Akun"),em=E(u.email||"");
+    return '<div class="acr">'+(u.photoURL?'<img class="acv" src="'+E(u.photoURL)+'" alt="" referrerpolicy="no-referrer">':'<div class="acv acd">'+nm.charAt(0).toUpperCase()+'</div>')+'<div class="acn"><b>'+nm+'</b><small>'+em+'</small></div></div><button class="btn dark wide" data-a="gout">Keluar</button>';
+  }
+  return '<div class="lvt"><b>Akun</b></div><small class="lvn">Masuk dengan Google agar nama, level, dan komentarmu tersimpan dan bisa dipakai di perangkat lain.</small><button class="btn gg wide" data-a="gin" style="margin-top:12px">Masuk dengan Google</button>';
+}
+window.accCard=accInner;
+function accUi(){const e=G("acc");if(e)e.innerHTML=accInner()}
+function gErr(e){
+  const c=(e&&e.code)||"";
+  if(c==="auth/popup-closed-by-user"||c==="auth/cancelled-popup-request")return;
+  if(c==="auth/popup-blocked")T("Popup diblokir, izinkan popup lalu coba lagi");
+  else if(c==="auth/unauthorized-domain")T("Domain situs belum diizinkan di Firebase");
+  else if(c==="auth/operation-not-allowed")T("Login Google belum diaktifkan di Firebase");
+  else T("Gagal masuk"+(c?" ("+c+")":""));
+}
+function gLogin(){
+  const cu=auth.currentUser;
+  if(!cu){T("Menyambungkan, coba lagi sebentar");return}
+  const pr=new GoogleAuthProvider();pr.setCustomParameters({prompt:"select_account"});
+  const p=cu.isAnonymous?linkWithPopup(cu,pr):signInWithPopup(auth,pr);
+  p.then(()=>{CM.user=auth.currentUser;accUi();cmForm();cmList();T("Berhasil masuk")}).catch(e=>{
+    if(e&&e.code==="auth/credential-already-in-use"){
+      const c=GoogleAuthProvider.credentialFromError(e);
+      if(c){flush().then(()=>signInWithCredential(auth,c)).then(()=>T("Masuk ke akun Google-mu")).catch(gErr);return}
+    }
+    gErr(e);
+  });
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest&&e.target.closest("#acc [data-a]");if(!b)return;
+  if(b.dataset.a==="gin")gLogin();
+  else if(b.dataset.a==="gout"){if(confirm("Keluar dari akun?"))signOut(auth).then(()=>T("Berhasil keluar")).catch(()=>{})}
+});
 
 /* saat mengetik/membalas: otomatis gulir ke kotak tulis (tepat di bawah video) */
 function cmFocusScroll(el){
@@ -520,6 +558,11 @@ input[type=range]{width:100%;accent-color:var(--ac)}
 .lvk{font-size:10px;padding:3px 8px;border-radius:10px;border:1px solid var(--ln);color:var(--m);opacity:.5}
 .lvk.on{color:var(--lc);border-color:var(--lc);opacity:1}
 .cmw input[readonly]{opacity:.7}
+.btn.gg{background:#fff;color:#1f1f1f;box-shadow:none}
+.acr{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.acv{width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.acd{display:flex;align-items:center;justify-content:center;background:var(--ac2);font-weight:700;font-size:18px}
+.acn{min-width:0}.acn b{display:block;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.acn small{color:var(--m);font-size:12px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (prefers-reduced-motion:reduce){.lvp i{transition:none}}
 </style>
 </head>
@@ -556,7 +599,7 @@ document.documentElement.style.setProperty("--logo","url("+LOGO+")");document.ge
 const $=i=>document.getElementById(i);
 const LS=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
 const SV=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&","<":"<",">":">",'"':""","'":"'"}[c]));
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const bg=u=>u?`style="background-image:url('${esc(u)}')"`:"";
 let sortBy="new",flt="all",HOT=new Set(),sleepT=0,sleepEnd=0,sleepV="0",tapT=0,tapN=0,tapS=0,lim=60,D=[],GL=[],GM={},SM={},tab="home",cat="all",q="",cur=-1,hls=null,ov=[],hT=0,anT=null,lastSave=0,exitArmed=0,tT=0,viewsOnce=0;
 
@@ -720,6 +763,7 @@ function rLib(){
 }
 function rProf(){
   return `<div class="pf"><div class="av big"></div><h2>LesehanTV</h2><p>👁 <span class="onl">${window.onlineN||1}</span> orang online</p></div>
+  <div class="card2 lvc" id="acc">${window.accCard?window.accCard():""}</div>
   <div class="card2 lvc" id="lvc">${window.lvCard?window.lvCard():""}</div>
   <div class="stack"><a class="btn don" href="https://saweria.co/AKUINGINTERKENAL" target="_blank" rel="noopener noreferrer">❤ Dukung LesehanTV via Saweria</a>
   <a class="btn tg" href="https://t.me/+U0ocipINk6MzYmE1" target="_blank" rel="noopener noreferrer">Join Komunitas Telegram</a></div>
